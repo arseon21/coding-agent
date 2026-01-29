@@ -158,18 +158,8 @@ class GitHubManager:
     def create_pull_request(
         self, title: str, body: str, head_branch: str, base_branch: str = "main"
     ) -> Optional[int]:
-        """
-        Создает Pull Request через GitHub API.
-
-        Args:
-            title (str): Заголовок PR.
-            body (str): Описание PR.
-            head_branch (str): Ветка с изменениями (source).
-            base_branch (str): Целевая ветка (target).
-
-        Returns:
-            Optional[int]: Номер созданного PR или None в случае ошибки.
-        """
+        if base_branch is None:
+            base_branch=self.remote_repo.default_branch
         try:
             pr = self.remote_repo.create_pull(
                 title=title,
