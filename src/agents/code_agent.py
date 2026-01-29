@@ -70,41 +70,33 @@ class CodeAgent:
             return {"files_to_create": [], "files_to_modify": []}
 
     def run(self, issue_number: int):
-        """Основной рабочий цикл агента."""
         try:
             logger.info(f"=== Запуск Code Agent для Issue #{issue_number} ===")
-
-            # ШАГ 1: Получаем Issue (через твой GitHubManager)
+            
+            # 1. Данные Issue
             issue_data = self.github.get_issue(issue_number)
-            if isinstance(issue_data, dict):
-                title = issue_data.get("title", "No Title")
-                body = issue_data.get("body", "")
-            else:
-                title = getattr(issue_data, "title", "No Title")
-                body = getattr(issue_data, "body", "")
-
-            logger.info(f"Задача принята: {title}")
-
-            # ШАГ 2: Собираем текущий код
+            title = issue_data.get("title", "No Title") if isinstance(issue_data, dict) else getattr(issue_data, "title", "No Title")
+            
+            # 2. Контекст
             context = self._get_project_context()
 
-            # ШАГ 3: Запрос к LLM (через твой метод get_response)
-            system_role = (
-                "Ты — Senior Python Developer. Отвечай ТОЛЬКО в формате JSON.\n"
-                "Структура: {\"files_to_create\": [], \"files_to_modify\": []}"
-            )
-            prompt = (
-                f"Реши задачу: {title}\nОписание: {body}\n\n"
-                f"Контекст проекта:\n{context}\n\n"
-                "Верни JSON с изменениями."
-            )
-
-            logger.info("Отправка запроса в YandexGPT...")
-            # Вызов твоего метода: get_response(prompt, system_role)
-            raw_response = self.llm.get_response(prompt, system_role=system_role)
-
-            # ШАГ 4: Парсинг ответа
+            # 3. Запрос к LLM
+            logger.info("Запрос к LLM...")
+            prompt = f"Исправь задачу: {title}\nКонтекст:\n{context}"
+            raw_response = self.llm.get_response(prompt)
             changes = self._parse_json_response(raw_response)
+
+            # 4. Работа с ветками (защищенная)
+            branch_name = f"fix/issue-{issue_number}"
+            
+            try:
+                self.github.create_branch(branch_name)
+            except Exception as e:
+                if "would be overwritten by checkout" in str(e):
+                    logger.error("У вас есть незакоммиченные изменения в коде агента! "
+                                 "Выполните 'git add . && git commit' перед запуском.")
+                    return # Прекращаем работу, чтобы не испортить код
+                raise e
 
             # ШАГ 5: Применение изменений в локальные файлы
             branch_name = f"fix/issue-{issue_number}"
@@ -125,8 +117,9 @@ class CodeAgent:
                     logger.info(f"Обновлен файл: {path}")
 
             # ШАГ 6: Git commit, push и PR
-            self.github.commit_all(f"Fix #{issue_number}: {title}")
-            self.github.push(branch_name)
+            commit_message = f"Fix #{issue_number}: {title}"
+            logger.info(f"Выполнение commit and push в ветку {branch_name}")
+            self.github.commit_and_push(branch_name=branch_name, commit_message=commit_message)
             
             pr_url = self.github.create_pull_request(
                 title=f"Fix: {title}",
