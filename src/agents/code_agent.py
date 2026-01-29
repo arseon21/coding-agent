@@ -145,8 +145,7 @@ class CodeAgent:
             pr_url = self.github.create_pull_request(
                 title=f"Fix: {title}",
                 body=f"Автоматический Pull Request для задачи #{issue_number}",
-                head_branch=branch_name,
-                base_branch="main"
+                head_branch=branch_name
             )
             logger.info(f"Pull Request создан: {pr_url}")
 
