@@ -82,7 +82,28 @@ class CodeAgent:
 
             # 3. Запрос к LLM
             logger.info("Запрос к LLM...")
-            prompt = f"Исправь задачу: {title}\nКонтекст:\n{context}"
+            prompt = f"""
+                Ты — профессиональный программист. Твоя задача — решить Issue в существующем проекте.
+                Issue: {title}
+
+                Контекст проекта:
+                {context}
+
+                ТВОЙ ОТВЕТ ДОЛЖЕН БЫТЬ СТРОГО В ФОРМАТЕ JSON. 
+                Не пиши никаких пояснений до или после JSON.
+                Если нужно создать файл, добавь его в 'files_to_create'. 
+                Если нужно изменить — в 'files_to_modify' (присылай полный новый контент файла).
+
+                Структура JSON:
+                {{
+                "files_to_create": [
+                    {{"path": "string", "content": "string"}}
+                ],
+                "files_to_modify": [
+                    {{"path": "string", "content": "string"}}
+                ]
+                }}
+                """
             raw_response = self.llm.get_response(prompt)
             changes = self._parse_json_response(raw_response)
 
@@ -124,10 +145,9 @@ class CodeAgent:
             pr_url = self.github.create_pull_request(
                 title=f"Fix: {title}",
                 body=f"Автоматический Pull Request для задачи #{issue_number}",
-                head=branch_name,
-                base="main"
+                head_branch=branch_name
             )
-            logger.info(f"Успех! Pull Request создан: {pr_url}")
+            logger.info(f"Pull Request создан: {pr_url}")
 
         except Exception as e:
             logger.error(f"Критическая ошибка в CodeAgent: {e}", exc_info=True)
