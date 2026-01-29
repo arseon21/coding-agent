@@ -35,7 +35,7 @@ class AppConfig:
 
         missing_vars = []
         if not github_token: missing_vars.append("GITHUB_TOKEN")
-        if not llm_api_key: missing_vars.append("YANDEX_API_KEY")
+        if not llm_api_key: missing_vars.append("LLM_API_KEY")
         if not repo_name: missing_vars.append("REPO_NAME")
 
         if missing_vars:
