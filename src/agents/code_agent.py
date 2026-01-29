@@ -123,11 +123,9 @@ class CodeAgent:
             
             pr_url = self.github.create_pull_request(
                 title=f"Fix: {title}",
-                body=f"Автоматический Pull Request для задачи #{issue_number}",
-                head=branch_name,
-                base="main"
+                body=f"Автоматический Pull Request для задачи #{issue_number}"
             )
-            logger.info(f"Успех! Pull Request создан: {pr_url}")
+            logger.info(f"Pull Request создан: {pr_url}")
 
         except Exception as e:
             logger.error(f"Критическая ошибка в CodeAgent: {e}", exc_info=True)
