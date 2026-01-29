@@ -29,7 +29,7 @@ def test_yandex_connection():
         
         response = client.get_response(test_prompt)
         
-        print("--- Ответ модели ---")
+        print("Ответ модели")
         print(response)
         print("--------------------")
         
