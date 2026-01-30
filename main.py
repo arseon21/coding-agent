@@ -34,9 +34,9 @@ def main():
                 agent.fix_pr(args.pr_number)
         
         elif args.command == "reviewer-agent":
-            reviewer = ReviewerAgent(config())
+            reviewer = ReviewerAgent(config)
             logger.info(f"Запускаю ревью PR #{args.pr_number}")
-            reviewer.review_pull_request(args.pr_number)
+            reviewer.run_review(args.pr_number)
             
         else:
             parser.print_help()

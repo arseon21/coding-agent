@@ -6,8 +6,6 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-RUN git config --global --add safe.directory /app
-
 # Настройка рабочей директории
 WORKDIR /app
 
@@ -17,6 +15,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Копируем исходный код
 COPY . .
+
+RUN git config --global --add safe.directory /app
 
 # Настройка PYTHONPATH, чтобы модули в /app/src были доступны
 ENV PYTHONPATH="/app:/app/src"
