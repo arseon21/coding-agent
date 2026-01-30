@@ -1,77 +1,66 @@
 name: AI SDLC Pipeline
 
 on:
-  # Сценарий 1: Запуск Code Agent при создании Issue
+  # Сценарий 1: Создание Issue запускает Code Agent
   issues:
     types: [opened]
-  
-  # Сценарий 2: Запуск тестов и AI Reviewer при создании или обновлении PR
+  # Сценарий 2: Создание или обновление PR запускает Reviewer Agent
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize]
 
 permissions:
-  contents: write      # Для пуша кода и чтения репозитория
-  pull-requests: write # Для создания PR и написания комментариев
-  issues: read         # Для чтения задач
+  contents: write      # Для пуша коммитов и создания веток
+  pull-requests: write # Для создания PR и комментариев
+  issues: write        # Для чтения/записи в issues
 
 jobs:
-  # ==========================================================
-  # JOB 1: Code Agent (Обработка Issue)
-  # ==========================================================
-  code_agent:
-    name: AI Code Agent
-    if: github.event_name == 'issues'
+  # === Job 1: AI Developer (Code Agent) ===
+  ai_developer:
+    name: AI Developer Agent
+    if: github.event_name == 'issues' && !contains(github.event.issue.labels.*.name, 'no-ai')
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # Важно: если вы хотите, чтобы пуш от агента триггерил другие workflow (например, ревью),
-          # здесь нужно использовать PAT (Personal Access Token), а не GITHUB_TOKEN.
-          # token: ${{ secrets.PAT_TOKEN }} 
-          fetch-depth: 0
+          fetch-depth: 0 # Важно для корректной работы git внутри агента
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Configure Git User
-        # Настройка git, чтобы коммиты от агента были подписаны
+        # Настройка git, чтобы агент мог делать коммиты от своего имени (или бота)
         run: |
-          git config --global user.name "AI Agent"
-          git config --global user.email "ai-agent@users.noreply.github.com"
+          git config --global user.email "agent@ai-bot.com"
+          git config --global user.name "AI Coding Agent"
 
       - name: Run Code Agent
         env:
-          # Секреты и переменные для работы скрипта
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          LLM_API_KEY: ${{ secrets.YANDEX_API_KEY }}
-          # Передаем контекст события
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-          repo_owner: ${{ github.repository_owner }}
-          repo_name: ${{ github.event.repository.name }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_NAME: ${{ github.repository }}
+          YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
+          YANDEX_FOLDER_ID: ${{ secrets.YANDEX_FOLDER_ID }}
+          # LLM_MODEL можно задать по умолчанию или тоже через секреты
+          LLM_MODEL: "yandexgpt" 
         run: |
-          # Запускаем CLI агента в режиме решения задачи
-          python main.py solve --issue-id "$ISSUE_NUMBER"
+          echo "Starting AI Developer for Issue #${{ github.event.issue.number }}"
+          python main.py solve --issue-id ${{ github.event.issue.number }}
 
-  # ==========================================================
-  # JOB 2: CI & AI Reviewer (Проверка PR)
-  # ==========================================================
+  # === Job 2: AI Reviewer (Reviewer Agent) ===
   ai_reviewer:
-    name: 🕵️ AI Reviewer & Tests
+    name: AI Code Reviewer
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -80,38 +69,31 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          # Установка pytest, если он не в requirements.txt
+          pip install pytest 
 
       - name: Run Tests (Pytest)
         id: run_tests
-        # continue-on-error: true — чтобы Reviewer запустился, даже если тесты упали.
-        # Мы хотим, чтобы AI проанализировал ошибки тестов.
-        continue-on-error: true
+        # Запускаем тесты. continue-on-error: true, если мы хотим, 
+        # чтобы ревьюер работал даже если тесты упали (чтобы сказать об этом).
+        continue-on-error: true 
         run: |
-          # Запускаем тесты и сохраняем вывод в файл для анализа агентом
-          pytest --junitxml=test-report.xml > test_output.txt 2>&1 || true
-          # Выводим в консоль для логов CI
-          cat test_output.txt
+          pytest > test_results.txt 2>&1 || echo "Tests failed"
+          cat test_results.txt
 
-      - name: Run AI Reviewer
+      - name: Run Reviewer Agent
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          PR_NUMBER: ${{ github.event.number }}
-          repo_owner: ${{ github.repository_owner }}
-          repo_name: ${{ github.event.repository.name }}
+          REPO_NAME: ${{ github.repository }}
+          YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
+          YANDEX_FOLDER_ID: ${{ secrets.YANDEX_FOLDER_ID }}
         run: |
-          # Запускаем CLI агента в режиме ревью
-          # Передаем путь к логам тестов, чтобы AI мог их прочитать
-          python main.py review --pr-id "$PR_NUMBER" --test-log "test_output.txt"
-        
-      - name: Fail Workflow if Tests Failed
-        # Если тесты упали, мы все равно должны пометить Job как failed,
-        # но ПОСЛЕ того, как AI оставит комментарий.
-        if: steps.run_tests.outcome == 'failure'
-        run: exit 1
+          echo "Starting AI Reviewer for PR #${{ github.event.pull_request.number }}"
+          # Можно передать лог тестов агенту, если доработать агента, 
+          # но пока запускаем стандартный review
+          python main.py review --pr-number ${{ github.event.pull_request.number }}

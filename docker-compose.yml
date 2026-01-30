@@ -3,11 +3,15 @@ version: '3.8'
 services:
   ai-agent:
     build: .
-    env_file:
-      - .env
     volumes:
+      # Пробрасываем текущую папку внутрь, чтобы агент видел изменения и .git
       - .:/app
     environment:
+      # Переменные берутся из локального .env файла
       - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - LLM_API_KEY=${LLM_API_KEY}
-      - LLM_MODEL=${LLM_MODEL}
+      - REPO_NAME=${REPO_NAME}
+      - YANDEX_API_KEY=${YANDEX_API_KEY}
+      - YANDEX_FOLDER_ID=${YANDEX_FOLDER_ID}
+      - LOG_LEVEL=INFO
+    # Пример команды для ручного запуска (закомментировано)
+    # command: solve --issue-id 1
