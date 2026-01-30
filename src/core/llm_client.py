@@ -15,7 +15,6 @@ class LLMClient:
         if not self.api_key or not self.folder_id:
             raise ValueError("Проверьте YANDEX_API_KEY и YANDEX_FOLDER_ID в .env")
 
-        # Читаем параметры и приводим к нужным типам
         self.model_name = os.environ.get("YANDEX_MODEL", "yandexgpt")
         self.temperature = float(os.environ.get("LLM_TEMPERATURE", "0.3"))
         self.max_tokens = int(os.environ.get("LLM_MAX_TOKENS", "2000"))
@@ -25,7 +24,6 @@ class LLMClient:
         self.url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 
     def get_response(self, prompt: str, system_role: str = "Ты — Python разработчик.") -> str:
-        # ВАЖНО: modelUri должен быть именно в таком формате
         model_uri = f"gpt://{self.folder_id}/{self.model_name}/latest"
         
         payload = {
@@ -33,16 +31,13 @@ class LLMClient:
             "completionOptions": {
                 "stream": False,
                 "temperature": self.temperature,
-                "maxTokens": str(self.max_tokens) # Некоторые версии API просят строку
+                "maxTokens": str(self.max_tokens)
             },
             "messages": [
                 {"role": "system", "text": system_role},
                 {"role": "user", "text": prompt}
             ]
         }
-
-        # Если ошибка 400 сохраняется, попробуйте изменить maxTokens на число:
-        # payload["completionOptions"]["maxTokens"] = self.max_tokens
 
         headers = {
             "Content-Type": "application/json",
@@ -61,12 +56,10 @@ class LLMClient:
                 )
                 
                 if response.status_code != 200:
-                    # КРИТИЧЕСКИЙ МОМЕНТ: Печатаем ЧТО ИМЕННО не понравилось Яндексу
                     error_data = response.json()
                     error_msg = error_data.get('message', response.text)
                     logger.error(f"Yandex API Error {response.status_code}: {error_msg}")
                     
-                    # Если это 400, повторы не помогут, нужно чинить конфиг
                     if response.status_code == 400:
                         raise ValueError(f"Ошибка в параметрах запроса: {error_msg}")
                     

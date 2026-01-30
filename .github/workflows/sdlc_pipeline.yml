@@ -1,15 +1,13 @@
 name: AI SDLC Pipeline
 
 on:
-  # Сценарий 1: Создание Issue
+  # Создание Issue запускает Code Agent
   issues:
     types: [opened]
-  
-  # ДОБАВЛЕНО: Триггер на комментарий к Issue
-  issue_comment:
+    issue_comment:
     types: [created]
 
-  # Сценарий 2: Создание или обновление PR
+  # Создание или обновление PR запускает Reviewer Agent
   pull_request:
     types: [opened, synchronize]
 
@@ -21,7 +19,6 @@ permissions:
 jobs:
   ai_developer:
     name: AI Developer Agent
-    # ИСПРАВЛЕНО УСЛОВИЕ: Запускать если это новое Issue ИЛИ комментарий в Issue (но не в PR)
     if: |
       (github.event_name == 'issues') || 
       (github.event_name == 'issue_comment' && !github.event.issue.pull_request)
@@ -56,7 +53,7 @@ jobs:
           YANDEX_FOLDER_ID: ${{ secrets.YANDEX_FOLDER_ID }}
           LLM_MODEL: "yandexgpt" 
         run: |
-          # Используем номер issue из события (работает и для issues, и для issue_comment)
+          echo "Starting AI Developer for Issue #${{ github.event.issue.number }}"
           python main.py solve --issue-id ${{ github.event.issue.number }}
 
   ai_reviewer:
@@ -78,6 +75,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          # Установка pytest, если он не в requirements.txt
+          pip install pytest 
+
+      - name: Run Tests (Pytest)
+        id: run_tests
+        continue-on-error: true 
+        run: |
+          pytest > test_results.txt 2>&1 || echo "Tests failed"
+          cat test_results.txt
 
       - name: Run Reviewer Agent
         env:
