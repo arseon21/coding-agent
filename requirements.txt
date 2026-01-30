@@ -1,8 +1,7 @@
-# Git & GitHub
+
 PyGithub>=2.1.1
 GitPython>=3.1.40
 
-# Утилиты
 requests>=2.31.0
 python-dotenv>=1.0.0
 click>=8.1.7

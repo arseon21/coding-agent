@@ -4,14 +4,10 @@ services:
   ai-agent:
     build: .
     volumes:
-      # Пробрасываем текущую папку внутрь, чтобы агент видел изменения и .git
       - .:/app
     environment:
-      # Переменные берутся из локального .env файла
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - REPO_NAME=${REPO_NAME}
       - YANDEX_API_KEY=${YANDEX_API_KEY}
       - YANDEX_FOLDER_ID=${YANDEX_FOLDER_ID}
       - LOG_LEVEL=INFO
-    # Пример команды для ручного запуска (закомментировано)
-    # command: solve --issue-id 1

@@ -3,14 +3,12 @@ import sys
 import logging
 from dotenv import load_dotenv
 
-# Корректная настройка путей для запуска из любой папки
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, "../../"))
 sys.path.append(project_root)
 
 from src.core.llm_client import LLMClient
 
-# Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
@@ -34,9 +32,9 @@ def test_yandex_connection():
         print("--------------------")
         
         if response and len(response) > 10:
-            print("\nТест пройден успешно!")
+            print("\nТест пройден")
         else:
-            print("\nОшибка: Получен пустой или слишком короткий ответ.")
+            print("\nПолучен пустой или слишком короткий ответ.")
 
     except Exception as e:
         print(f"\n Тест провалился с ошибкой:")

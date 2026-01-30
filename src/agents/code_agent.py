@@ -24,13 +24,10 @@ class CodeAgent:
             repo_name=config.repo_name
         )
         self.llm = LLMClient()
-        # Инициализация LLM через твой метод init
         if hasattr(self.llm, 'init'):
             try:
-                # Пробуем без аргументов (если берет из env)
                 self.llm.init()
             except TypeError:
-                # Если требует api_key
                 self.llm.init(api_key=config.llm_api_key)
 
         self.excluded_dirs = {".git", "venv", "__pycache__", "node_modules", ".idea"}
@@ -65,7 +62,6 @@ class CodeAgent:
         try:
             logger.info(f"=== [START] Code Agent | Issue #{issue_number} ===")
 
-            # 1. Читаем Issue
             issue_data = self.github.get_issue(issue_number)
             if isinstance(issue_data, dict):
                 title = issue_data.get("title", "No Title")
@@ -76,10 +72,8 @@ class CodeAgent:
 
             logger.info(f"Задача: {title}")
 
-            # 2. Собираем контекст
             context = self._get_project_context()
 
-            # 3. Запрос к LLM
             system_role = (
                 "Ты — Senior Python Developer. \n"
                 "Весь программный код внутри JSON-полей должен быть представлен как одна строка, где все переносы строк заменены на символ \n, а внутренние двойные кавычки экранированы как \"."
@@ -95,10 +89,8 @@ class CodeAgent:
             raw_response = self.llm.get_response(prompt, system_role=system_role)
             logger.info("Ответ от LLM получен.")
 
-            # 4. Применяем изменения
             changes = self._parse_json_response(raw_response)
             
-            # Создаем ветку
             branch_name = f"fix/issue-{issue_number}"
             self.github.create_branch(branch_name)
 
@@ -122,18 +114,16 @@ class CodeAgent:
             if not applied_any:
                 logger.warning("Изменения не были применены. Проверь ответ LLM.")
 
-            # 5. Commit & Push (твой объединенный метод)
             commit_message = f"Fix #{issue_number}: {title}"
             logger.info(f"Коммит и пуш в ветку {branch_name}...")
             self.github.commit_and_push(branch_name, commit_message)
 
-            # 6. Pull Request (позиционные аргументы)
             logger.info("Создание Pull Request...")
             pr_url = self.github.create_pull_request(
-                f"Fix: {title}",                 # title
-                f"Automated fix for #{issue_number}",  # body
-                branch_name,                     # head
-                "main"                           # base
+                f"Fix: {title}",
+                f"Automated fix for #{issue_number}",
+                branch_name,
+                "main"
             )
             
             logger.info(f"Прошло успешно! PR: {pr_url}")

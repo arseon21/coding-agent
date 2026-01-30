@@ -1,20 +1,19 @@
 name: AI SDLC Pipeline
 
 on:
-  # Сценарий 1: Создание Issue запускает Code Agent
+  # Создание Issue запускает Code Agent
   issues:
     types: [opened]
-  # Сценарий 2: Создание или обновление PR запускает Reviewer Agent
+  # Создание или обновление PR запускает Reviewer Agent
   pull_request:
     types: [opened, synchronize]
 
 permissions:
-  contents: write      # Для пуша коммитов и создания веток
-  pull-requests: write # Для создания PR и комментариев
-  issues: write        # Для чтения/записи в issues
+  contents: write
+  pull-requests: write
+  issues: write
 
 jobs:
-  # === Job 1: AI Developer (Code Agent) ===
   ai_developer:
     name: AI Developer Agent
     if: github.event_name == 'issues' && !contains(github.event.issue.labels.*.name, 'no-ai')
@@ -23,7 +22,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Важно для корректной работы git внутри агента
+          fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
@@ -37,7 +36,6 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Configure Git User
-        # Настройка git, чтобы агент мог делать коммиты от своего имени (или бота)
         run: |
           git config --global user.email "agent@ai-bot.com"
           git config --global user.name "AI Coding Agent"
@@ -48,13 +46,11 @@ jobs:
           REPO_NAME: ${{ github.repository }}
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
           YANDEX_FOLDER_ID: ${{ secrets.YANDEX_FOLDER_ID }}
-          # LLM_MODEL можно задать по умолчанию или тоже через секреты
           LLM_MODEL: "yandexgpt" 
         run: |
-          echo "Starting AI Developer for Issue #${{ github.event.issue.number }}"
+          echo "Starting AI Dseveloper for Issue #${{ github.event.issue.number }}"
           python main.py solve --issue-id ${{ github.event.issue.number }}
 
-  # === Job 2: AI Reviewer (Reviewer Agent) ===
   ai_reviewer:
     name: AI Code Reviewer
     if: github.event_name == 'pull_request'
@@ -79,8 +75,6 @@ jobs:
 
       - name: Run Tests (Pytest)
         id: run_tests
-        # Запускаем тесты. continue-on-error: true, если мы хотим, 
-        # чтобы ревьюер работал даже если тесты упали (чтобы сказать об этом).
         continue-on-error: true 
         run: |
           pytest > test_results.txt 2>&1 || echo "Tests failed"
