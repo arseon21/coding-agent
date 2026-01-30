@@ -1,4 +1,4 @@
 def add(a, b): 
     print("DEBUG: Secret key is 12345")
-    res = a+b
+    res = a*b
     return res
