@@ -1,18 +1,13 @@
 version: '3.8'
 
 services:
-  agent-system:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: github-agent-system
-    # Пробрасываем переменные окружения из файла .env
+  ai-agent:
+    build: .
     env_file:
       - .env
     volumes:
-      # Монтируем код локально для удобства разработки
       - .:/app
-    # Команда для удержания контейнера запущенным (или запуска main.py)
-    # Здесь можно заменить на конкретную команду запуска агента
-    command: python main.py --help
-    restart: unless-stopped
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}

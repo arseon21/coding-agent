@@ -1,34 +1,25 @@
-# Используем официальный легкий образ Python
+# Ипользуем официальный образ Python 3.11
 FROM python:3.11-slim
 
-# Переменные окружения для Python
-# PYTHONDONTWRITEBYTECODE 1: Запрещает Python писать файлы .pyc на диск
-# PYTHONUNBUFFERED 1: Гарантирует, что логи Python выводятся в консоль без буферизации
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
-
-# Устанавливаем рабочую директорию
-WORKDIR /app
-
-# Устанавливаем системные зависимости (git нужен для GitPython)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Установка системных зависимостей для Git и работы с репозиториями
+RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Копируем файл зависимостей
+RUN git config --global --add safe.directory /app
+
+# Настройка рабочей директории
+WORKDIR /app
+
+# Копируем зависимости и устанавливаем их
 COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Устанавливаем зависимости
-RUN pip install --upgrade pip && \
-    pip install -r requirements.txt
-
-# Копируем исходный код проекта
+# Копируем исходный код
 COPY . .
 
-# Создаем не-root пользователя для безопасности
-RUN useradd -m appuser && chown -R appuser /app
-USER appuser
+# Настройка PYTHONPATH, чтобы модули в /app/src были доступны
+ENV PYTHONPATH="/app:/app/src"
 
-# Точка входа (по умолчанию запускает CLI справку)
-CMD ["python", "main.py", "--help"]
+# Точка входа
+ENTRYPOINT ["python", "main.py"]

@@ -17,7 +17,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class CodeAgent:
-    def __init__(self):
+    def __init__(self, config):
+        self.config = config
         self.github = GitHubManager(
             token=config.github_token,
             repo_name=config.repo_name
@@ -80,7 +81,8 @@ class CodeAgent:
 
             # 3. Запрос к LLM
             system_role = (
-                "Ты — Senior Python Developer. Ты отвечаешь ТОЛЬКО чистым JSON.\n"
+                "Ты — Senior Python Developer. \n"
+                "Весь программный код внутри JSON-полей должен быть представлен как одна строка, где все переносы строк заменены на символ \n, а внутренние двойные кавычки экранированы как \"."
                 "Формат: {\"files_to_create\": [{\"path\": \"...\", \"content\": \"...\"}], \"files_to_modify\": []}"
             )
             prompt = (

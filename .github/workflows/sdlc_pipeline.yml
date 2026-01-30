@@ -1,0 +1,68 @@
+name: AI-Driven SDLC Pipeline
+
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened, synchronize]
+  # Триггер для автоматического исправления при добавлении метки
+  pull_request_target:
+    types: [labeled]
+
+jobs:
+  # 1. Генерация кода по новой Issue
+  code_generation:
+    if: github.event_name == 'issues'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Run Code Agent
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          LLM_API_KEY: ${{ secrets.YANDEX_API_KEY }}
+        run: |
+          docker build -t ai-agent .
+          docker run --env GITHUB_TOKEN --env LLM_API_KEY ai-agent code-agent --issue-number ${{ github.event.issue.number }}
+
+  # 2. Ревью кода при создании или обновлении PR
+  code_review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Lint with Ruff
+        run: |
+          pip install ruff
+          ruff check .
+          
+      - name: Run Tests
+        run: |
+          pip install pytest
+          pytest tests/
+
+      - name: Run AI Reviewer
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          LLM_API_KEY: ${{ secrets.YANDEX_API_KEY }}
+        run: |
+          docker build -t ai-agent .
+          docker run --env GITHUB_TOKEN --env LLM_API_KEY ai-agent reviewer-agent --pr-number ${{ github.event.pull_request.number }}
+
+  # 3. Авто-исправление, если навесили метку "needs-fix"
+  auto_fix:
+    if: github.event.label.name == 'needs-fix'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Run Code Agent to Fix PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          LLM_API_KEY: ${{ secrets.YANDEX_API_KEY }}
+        run: |
+          docker build -t ai-agent .
+          docker run --env GITHUB_TOKEN --env LLM_API_KEY ai-agent code-agent --pr-number ${{ github.event.pull_request.number }}

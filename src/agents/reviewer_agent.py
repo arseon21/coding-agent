@@ -10,7 +10,8 @@ from core.llm_client import LLMClient
 logger = logging.getLogger(__name__)
 
 class ReviewerAgent:
-    def __init__(self):
+    def __init__(self,congig):
+        self.config = config
         self.gh_manager = GitHubManager(
             token=config.github_token,
             repo_name=config.repo_name
