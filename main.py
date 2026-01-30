@@ -55,7 +55,7 @@ def main():
         logger.info(f"Starting Reviewer Agent for PR #{args.pr_number}")
         try:
             # ReviewerAgent в PDF инициализирует конфиг внутри себя, аргументы не нужны
-            agent = ReviewerAgent()
+            agent = ReviewerAgent(config)
             agent.run_review(args.pr_number)
         except Exception as e:
             logger.error(f"Reviewer Agent failed: {e}", exc_info=True)
