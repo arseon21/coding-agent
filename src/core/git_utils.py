@@ -202,3 +202,27 @@ class GitHubManager:
         except GithubException as e:
             logger.error(f"Ошибка при добавлении комментария к PR #{pr_number}: {e}")
             raise
+
+    def get_pull_request(self, pr_number: int) -> PullRequest:
+        """Получает объект Pull Request по номеру."""
+        try:
+            return self.remote_repo.get_pull(pr_number)
+        except GithubException as e:
+            logger.error(f"Ошибка при получении PR #{pr_number}: {e}")
+            raise
+
+    def get_pr_diff(self, pr_number: int) -> str:
+        """
+        Получает diff (изменения) Pull Request в текстовом виде.
+        """
+        try:
+            pr = self.get_pull_request(pr_number)
+            # Мы собираем патчи всех файлов в одну строку
+            files = pr.get_files()
+            diff_text = ""
+            for file in files:
+                diff_text += f"\nFile: {file.filename}\n{file.patch}\n"
+            return diff_text
+        except Exception as e:
+            logger.error(f"Ошибка при получении diff для PR #{pr_number}: {e}")
+            raise

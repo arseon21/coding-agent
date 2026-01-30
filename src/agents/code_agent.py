@@ -134,7 +134,7 @@ class CodeAgent:
                 "main"                           # base
             )
             
-            logger.info(f"🚀 ВСЁ ПРОШЛО УСПЕШНО! PR: {pr_url}")
+            logger.info(f"Прошло успешно! PR: {pr_url}")
 
         except Exception as e:
             logger.error(f"Критическая ошибка: {e}", exc_info=True)
