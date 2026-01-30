@@ -1,1 +1,4 @@
-def add(a, b): return a + b
+def add(a, b): 
+    print("DEBUG: Secret key is 12345")
+    res = a+b
+    return res
