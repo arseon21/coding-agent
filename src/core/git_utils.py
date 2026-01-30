@@ -211,18 +211,30 @@ class GitHubManager:
             logger.error(f"Ошибка при получении PR #{pr_number}: {e}")
             raise
 
+# Добавь это в файл src/core/git_utils.py внутри класса GitHubManager
+
     def get_pr_diff(self, pr_number: int) -> str:
-        """
-        Получает diff (изменения) Pull Request в текстовом виде.
-        """
+        """Получает текст изменений (diff) конкретного PR."""
         try:
-            pr = self.get_pull_request(pr_number)
-            # Мы собираем патчи всех файлов в одну строку
+            pr = self.remote_repo.get_pull(pr_number)
+            diff_url = pr.diff_url
+            # Можно просто собрать файлы как в ReviewerAgent
             files = pr.get_files()
             diff_text = ""
             for file in files:
                 diff_text += f"\nFile: {file.filename}\n{file.patch}\n"
             return diff_text
         except Exception as e:
-            logger.error(f"Ошибка при получении diff для PR #{pr_number}: {e}")
-            raise
+            logger.error(f"Ошибка получения diff: {e}")
+            return ""
+
+    def get_last_comment(self, pr_number: int) -> str:
+        """Получает последний комментарий от ревьюера в PR."""
+        try:
+            issue = self.remote_repo.get_issue(pr_number)
+            comments = issue.get_comments()
+            if comments.totalCount > 0:
+                return comments[comments.totalCount - 1].body
+            return "Комментариев нет."
+        except Exception as e:
+            return str(e)

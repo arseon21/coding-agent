@@ -61,48 +61,61 @@ class CodeAgent:
             logger.error(f"Ошибка парсинга JSON: {e}. Сырой текст: {text}")
             return {"files_to_create": [], "files_to_modify": []}
 
-    def run(self, issue_number: int):
+def run(self, issue_number: int, pr_number: int = None):
         try:
             logger.info(f"=== [START] Code Agent | Issue #{issue_number} ===")
 
             # 1. Читаем Issue
             issue_data = self.github.get_issue(issue_number)
-            if isinstance(issue_data, dict):
-                title = issue_data.get("title", "No Title")
-                body = issue_data.get("body", "")
-            else:
-                title = getattr(issue_data, "title", "No Title")
-                body = getattr(issue_data, "body", "")
+            title = issue_data.get("title", "No Title") if isinstance(issue_data, dict) else getattr(issue_data, "title", "No Title")
+            body = issue_data.get("body", "") if isinstance(issue_data, dict) else getattr(issue_data, "body", "")
 
-            logger.info(f"Задача: {title}")
-
-            # 2. Собираем контекст
+            # 2. Собираем контекст проекта
             context = self._get_project_context()
 
-            # 3. Запрос к LLM
-            system_role = (
-                "Ты — Senior Python Developer. \n"
-                "Весь программный код внутри JSON-полей должен быть представлен как одна строка, где все переносы строк заменены на символ \n, а внутренние двойные кавычки экранированы как \"."
-                "Формат: {\"files_to_create\": [{\"path\": \"...\", \"content\": \"...\"}], \"files_to_modify\": []}"
-            )
-            prompt = (
-                f"Реши задачу: {title}\n"
-                f"Описание: {body}\n\n"
-                f"Контекст проекта:\n{context}"
-            )
+            # 3. Настраиваем промпт в зависимости от того, создаем мы или исправляем
+            if pr_number:
+                logger.info(f"Режим исправления для PR #{pr_number}")
+                # Получаем текущий код и комментарии ревьюера
+                diff = self.github.get_pr_diff(pr_number)
+                # (Важно: добавь метод get_issue_comments в git_utils, если его нет)
+                comments = self.github.get_issue(pr_number) 
+                
+                system_role = (
+                    "Ты — Senior Python Developer. Твоя задача — ИСПРАВИТЬ ошибки в коде согласно замечаниям ревьюера.\n"
+                    "Отвечай ТОЛЬКО в формате JSON."
+                )
+                prompt = (
+                    f"Исправь ошибки в коде для задачи: {title}\n"
+                    f"Замечания ревьюера: {comments}\n"
+                    f"Текущие изменения (diff):\n{diff}\n"
+                    f"Контекст проекта:\n{context}"
+                )
+            else:
+                logger.info(f"Режим создания нового решения")
+                system_role = (
+                    "Ты — Senior Python Developer. \n"
+                    "Весь программный код внутри JSON-полей должен быть представлен как одна строка, где все переносы строк заменены на символ \\n, а внутренние двойные кавычки экранированы.\n"
+                    "Формат: {\"files_to_create\": [{\"path\": \"...\", \"content\": \"...\"}], \"files_to_modify\": []}"
+                )
+                prompt = (
+                    f"Реши задачу: {title}\n"
+                    f"Описание: {body}\n\n"
+                    f"Контекст проекта:\n{context}"
+                )
 
             logger.info("Запрос к YandexGPT за решением...")
             raw_response = self.llm.get_response(prompt, system_role=system_role)
-            logger.info("Ответ от LLM получен.")
-
+            
             # 4. Применяем изменения
             changes = self._parse_json_response(raw_response)
             
-            # Создаем ветку
+            # Переключаемся на ветку (create_branch в PDF умеет переключаться на существующую)
             branch_name = f"fix/issue-{issue_number}"
             self.github.create_branch(branch_name)
 
             applied_any = False
+            # ... далее твой код применения изменений (циклы for f in changes...)
             for f in changes.get("files_to_create", []):
                 path = f["path"]
                 os.makedirs(os.path.dirname(path) or ".", exist_ok=True)

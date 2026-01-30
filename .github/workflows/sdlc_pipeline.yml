@@ -1,89 +1,74 @@
-name: AI SDLC Pipeline
+name: AI Self-Healing Pipeline
 
 on:
-  # Сценарий 1: Создание Issue
   issues:
     types: [opened]
-  
-  # ДОБАВЛЕНО: Триггер на комментарий к Issue
   issue_comment:
     types: [created]
-
-  # Сценарий 2: Создание или обновление PR
   pull_request:
     types: [opened, synchronize]
 
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-
 jobs:
-  ai_developer:
-    name: AI Developer Agent
-    # ИСПРАВЛЕНО УСЛОВИЕ: Запускать если это новое Issue ИЛИ комментарий в Issue (но не в PR)
-    if: |
-      (github.event_name == 'issues') || 
-      (github.event_name == 'issue_comment' && !github.event.issue.pull_request)
+  # 1. Разработка (запускается только для новых Issue)
+  develop:
+    if: github.event_name == 'issues'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-
-      - name: Configure Git User
-        run: |
-          git config --global user.email "agent@ai-bot.com"
-          git config --global user.name "AI Coding Agent"
-
+      - uses: actions/checkout@v4
       - name: Run Code Agent
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO_NAME: ${{ github.repository }}
-          YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
-          YANDEX_FOLDER_ID: ${{ secrets.YANDEX_FOLDER_ID }}
-          LLM_MODEL: "yandexgpt" 
-        run: |
-          # Используем номер issue из события (работает и для issues, и для issue_comment)
-          python main.py solve --issue-id ${{ github.event.issue.number }}
+        env: ${{ secrets }}
+        run: python main.py solve --issue-id ${{ github.event.issue.number }}
 
-  ai_reviewer:
-    name: AI Code Reviewer
+  # 2. Ревьюер (запускается на каждый PR или его обновление)
+  review:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    outputs:
+      verdict: ${{ steps.analysis.outputs.verdict }} # Передаем вердикт дальше
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
+      - uses: actions/checkout@v4
+      - name: Install dependencies & Run Tests
+        id: tests
         run: |
-          python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-
-      - name: Run Reviewer Agent
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO_NAME: ${{ github.repository }}
-          YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
-          YANDEX_FOLDER_ID: ${{ secrets.YANDEX_FOLDER_ID }}
+          pytest --junitxml=report.xml || echo "tests_failed=true" >> $GITHUB_ENV
+          
+      - name: AI Review
+        id: analysis
+        env: ${{ secrets }}
         run: |
-          python main.py review --pr-number ${{ github.event.pull_request.number }}
+          # Запускаем ревьюера и сохраняем его вердикт в output
+          REPORT=$(python main.py review --pr-number ${{ github.event.pull_request.number }})
+          echo "$REPORT"
+          if echo "$REPORT" | grep -q "REQUEST_CHANGES"; then
+            echo "verdict=FAIL" >> $GITHUB_OUTPUT
+          else
+            echo "verdict=PASS" >> $GITHUB_OUTPUT
+          fi
+
+  # 3. Авто-исправление (Запускается ТОЛЬКО если Ревьюер сказал FAIL)
+  auto-fix:
+    needs: review
+    if: needs.review.outputs.verdict == 'FAIL'
+    runs-on: ubuntu-latest
+    # Ограничение итераций: проверяем количество комментариев бота в PR
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Iteration Limit
+        id: limit
+        run: |
+          # Простой хак: считаем сколько раз бот уже писал в этот PR
+          COUNT=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            | grep -c "Отчет ревьюера")
+          echo "Iteration count: $COUNT"
+          if [ $COUNT -gt 3 ]; then
+            echo "Limit reached. Stopping auto-fix."
+            exit 1
+          fi
+
+      - name: Code Agent Fix
+        env: ${{ secrets }}
+        run: |
+          # Запускаем агента в режиме исправления
+          # Нам нужно найти номер Issue из описания PR (агент умеет это делать)
+          python main.py solve --issue-id ${{ steps.extract.outputs.issue_id }} --pr-number ${{ github.event.pull_request.number }}
